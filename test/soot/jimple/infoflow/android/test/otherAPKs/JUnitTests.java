@@ -12,12 +12,10 @@ package soot.jimple.infoflow.android.test.otherAPKs;
 
 import java.io.IOException;
 
-import org.junit.Assert;
-import org.junit.Test;
 import org.xmlpull.v1.XmlPullParserException;
 
-import soot.jimple.infoflow.InfoflowResults;
 import soot.jimple.infoflow.android.SetupApplication;
+import soot.jimple.infoflow.results.InfoflowResults;
 import soot.jimple.infoflow.taintWrappers.EasyTaintWrapper;
 
 public class JUnitTests {
@@ -64,26 +62,10 @@ public class JUnitTests {
 		SetupApplication setupApplication = new SetupApplication(androidJars, fileName);
 		setupApplication.setTaintWrapper(new EasyTaintWrapper("EasyTaintWrapperSource.txt"));
 		setupApplication.calculateSourcesSinksEntrypoints("SourcesAndSinks.txt");
-		setupApplication.setEnableImplicitFlows(enableImplicitFlows);
-		setupApplication.setEnableStaticFieldTracking(enableStaticFields);
-		setupApplication.setFlowSensitiveAliasing(flowSensitiveAliasing);
+		setupApplication.getConfig().setEnableImplicitFlows(enableImplicitFlows);
+		setupApplication.getConfig().setEnableStaticFieldTracking(enableStaticFields);
+		setupApplication.getConfig().setFlowSensitiveAliasing(flowSensitiveAliasing);
 		return setupApplication.runInfoflow();
 	}
-
-	@Test
-	public void runTest1() throws IOException, XmlPullParserException {
-		InfoflowResults res = analyzeAPKFile
-				("testAPKs/9458cfb51c90130938abcef7173c3f6d44a02720.apk", false, false, false);
-		Assert.assertNotNull(res);
-		Assert.assertTrue(res.size() > 0);
-	}
-
-	@Test
-	public void runTest2() throws IOException, XmlPullParserException {
-		InfoflowResults res = analyzeAPKFile
-				("testAPKs/enriched1.apk", false, false, false);
-		Assert.assertNotNull(res);
-		Assert.assertEquals(1, res.size());
-	}
-
+	
 }

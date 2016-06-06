@@ -7,9 +7,10 @@ import java.io.InputStream;
 
 import org.xmlpull.v1.XmlPullParserException;
 
-import pxb.android.axml.AxmlVisitor;
 import soot.jimple.infoflow.android.axml.AXmlAttribute;
+import soot.jimple.infoflow.android.axml.AXmlNamespace;
 import soot.jimple.infoflow.android.axml.AXmlNode;
+import soot.jimple.infoflow.android.axml.AXmlTypes;
 import android.content.res.AXmlResourceParser;
 
 /**
@@ -18,7 +19,7 @@ import android.content.res.AXmlResourceParser;
  * @author Steven Arzt
  */
 public class AXMLPrinter2Parser extends AbstractBinaryXMLFileParser {
-
+		
 	@Override
 	public void parseFile(byte[] inputBuffer) throws IOException {
 		InputStream buffer = new BufferedInputStream(new ByteArrayInputStream(inputBuffer));
@@ -30,10 +31,17 @@ public class AXMLPrinter2Parser extends AbstractBinaryXMLFileParser {
 		// create parser and parse the xml's contents
 		AXmlResourceParser parser = new AXmlResourceParser();
 		parser.open(buffer);
-		
+				
 		int type = -1;
 		String tag;
 		try {
+			// Register the namespaces
+			for (int i = 0; i < parser.getNamespaceCount(parser.getDepth()); i++) {
+				this.document.addNamespace(new AXmlNamespace(parser.getNamespacePrefix(i),
+						parser.getNamespaceUri(i), parser.getLineNumber()));
+			}
+			
+			// Load the nodes
 			while ((type = parser.next()) != AXmlResourceParser.END_DOCUMENT) {
 				switch (type) {
 					// Currently nothing to do at the document's start
@@ -52,20 +60,31 @@ public class AXMLPrinter2Parser extends AbstractBinaryXMLFileParser {
 						for(int i = 0; i < parser.getAttributeCount(); i++) {
 							String name = parser.getAttributeName(i);
 							String ns = parser.getAttributeNamespace(i);
+							int atype = parser.getAttributeValueType(i);
 							AXmlAttribute<?> attr = null;
-							
+														
 							// we only parse attribute of types string, boolean and integer
-							switch(parser.getAttributeValueType(i)) {
-								case AxmlVisitor.TYPE_STRING:
-									attr = new AXmlAttribute<String>(name, parser.getAttributeValue(i), ns, false);
+							int resourceId = parser.getAttributeNameResource(i);
+							switch(atype) {
+								case AXmlTypes.TYPE_STRING:
+									attr = new AXmlAttribute<String>(name, resourceId, atype,
+											parser.getAttributeValue(i), ns, false);
 									break;
-								case AxmlVisitor.TYPE_INT_BOOLEAN:
-									attr = new AXmlAttribute<Boolean>(name, parser.getAttributeBooleanValue(i, false), ns, false);
+								case AXmlTypes.TYPE_INT_BOOLEAN:
+									attr = new AXmlAttribute<Boolean>(name, resourceId, atype,
+											parser.getAttributeBooleanValue(i, false), ns, false);
 									break;
-								case AxmlVisitor.TYPE_FIRST_INT:
-								case AxmlVisitor.TYPE_INT_HEX:
-									attr = new AXmlAttribute<Integer>(name, parser.getAttributeIntValue(i, 0), ns, false);
+								case AXmlTypes.TYPE_FIRST_INT:
+								case AXmlTypes.TYPE_INT_HEX:
+									attr = new AXmlAttribute<Integer>(name, resourceId, atype,
+											parser.getAttributeIntValue(i, 0), ns, false);
 									break;
+								case AXmlTypes.TYPE_REFERENCE:
+									attr = new AXmlAttribute<Integer>(name, resourceId, atype,
+											parser.getAttributeResourceValue(i, 0), ns, false);
+									break;
+								default:
+									System.err.println("Unsupported attribute type: " + atype);
 							}
 							
 							// if we can't handle the attributes type we simply ignore it
@@ -76,7 +95,7 @@ public class AXMLPrinter2Parser extends AbstractBinaryXMLFileParser {
 					// A closing tag indicates we must move
 					// one level upwards in the xml tree
 					case AXmlResourceParser.END_TAG:
-						this.root = node;
+						this.document.setRootNode(node);
 						node = parent;
 						parent = (parent == null ? null : parent.getParent());
 						break;

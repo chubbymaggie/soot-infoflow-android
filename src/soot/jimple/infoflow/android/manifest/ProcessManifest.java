@@ -80,7 +80,15 @@ public class ProcessManifest {
 	 */
 	public ProcessManifest(File apkFile) throws IOException, XmlPullParserException {
 		this.apk = new ApkHandler(apkFile);
-		this.handle(this.apk.getInputStream("AndroidManifest.xml"));
+		InputStream is = null;
+		try {
+			is = this.apk.getInputStream("AndroidManifest.xml");
+			this.handle(is);
+		}
+		finally {
+			if (is != null)
+				is.close();
+		}
 	}
 		
 	/**
@@ -392,7 +400,7 @@ public class ProcessManifest {
 	 */
 	public int getVersionCode() {
 		AXmlAttribute<?> attr = this.manifest.getAttribute("versionCode");
-		return attr == null ? -1 : Integer.getInteger((String) attr.getValue());
+		return attr == null ? -1 : Integer.parseInt("" + attr.getValue());
 	}
 	
 	/**
@@ -431,7 +439,14 @@ public class ProcessManifest {
 		if (usesSdk == null || usesSdk.isEmpty())
 			return -1;
 		AXmlAttribute<?> attr = usesSdk.get(0).getAttribute("minSdkVersion");
-		return attr == null ? -1 : Integer.getInteger((String) attr.getValue());		
+		
+		if (attr == null)
+			return -1;
+		
+		if (attr.getValue() instanceof Integer)
+			return (Integer) attr.getValue();
+		
+		return Integer.parseInt("" + attr.getValue());		
 	}
 	
 	/**
@@ -443,7 +458,14 @@ public class ProcessManifest {
 		if (usesSdk == null || usesSdk.isEmpty())
 			return -1;
 		AXmlAttribute<?> attr = usesSdk.get(0).getAttribute("targetSdkVersion");
-		return attr == null ? -1 : Integer.getInteger((String) attr.getValue());
+
+		if (attr == null)
+			return -1;
+		
+		if (attr.getValue() instanceof Integer)
+			return (Integer) attr.getValue();
+		
+		return Integer.parseInt("" + attr.getValue());		
 	}
 	
 	/**
@@ -467,6 +489,94 @@ public class ProcessManifest {
 			}
 		}
 		return permissions;
+	}
+	
+	/**
+	 * Adds a new permission to the manifest.
+	 * @param complete permission name e.g. "android.permission.INTERNET"
+	 */
+	public void addPermission(String permissionName) {				
+		AXmlNode permission = new AXmlNode("uses-permission", null, manifest);
+		AXmlAttribute<String> permissionNameAttr = new AXmlAttribute<String>("name", permissionName,  AXmlHandler.ANDROID_NAMESPACE);		
+		permission.addAttribute(permissionNameAttr);
+	}
+	
+	/**
+	 * Adds a new provider to the manifest
+	 * @param node provider represented as an AXmlNode
+	 */
+	public void addProvider(AXmlNode node) {
+		if (providers.isEmpty()) 
+			providers = new ArrayList<AXmlNode>();		
+		providers.add(node);
+	}
+	
+	/**
+	 * Adds a new receiver to the manifest
+	 * @param node receiver represented as an AXmlNode
+	 */
+	public void addReceiver(AXmlNode node) {
+		if (receivers.isEmpty()) 
+			receivers = new ArrayList<AXmlNode>();
+		receivers.add(node);
+	}
+	
+	/**
+	 * Adds a new activity to the manifest
+	 * @param node activity represented as an AXmlNode
+	 */
+	public void addActivity(AXmlNode node) {
+		if (activities.isEmpty()) 
+			activities = new ArrayList<AXmlNode>();
+		activities.add(node);
+	}
+	
+	/**
+	 * Adds a new service to the manifest
+	 * @param node service represented as an AXmlNode
+	 */
+	public void addService(AXmlNode node) {
+		if (services.isEmpty())
+			services = new ArrayList<AXmlNode>();
+		services.add(node);
+	}
+	
+	/**
+	 * Closes this apk file and all resources associated with it
+	 */
+	public void close() {
+		if (this.apk != null)
+			this.apk.close();
+	}
+	
+	/**
+	 * Returns all activity nodes that are "launchable", i.e. that are called when the user 
+	 * clicks on the button in the launcher.
+	 * @return
+	 */
+	public Set<AXmlNode> getLaunchableActivities() {
+		Set<AXmlNode> allLaunchableActivities = new HashSet<AXmlNode>();
+		
+		for(AXmlNode activity : activities) {
+			for(AXmlNode activityChildren : activity.getChildren()) {
+				if(activityChildren.getTag().equals("intent-filter")) {
+					boolean actionFilter = false;
+					boolean categoryFilter = false;
+					for(AXmlNode intentFilter : activityChildren.getChildren()) {
+						if(intentFilter.toString().equals("<action name=\"android.intent.action.MAIN\">"))
+							actionFilter = true;
+						else if(intentFilter.toString().equals("<category name=\"android.intent.category.LAUNCHER\">"))
+							categoryFilter = true;
+					}
+					
+					if(actionFilter && categoryFilter)
+						allLaunchableActivities.add(activity);
+				}
+			}
+			
+		}
+		
+		return allLaunchableActivities;
 	}
 	
 }
